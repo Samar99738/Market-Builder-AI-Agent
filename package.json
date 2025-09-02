@@ -6,6 +6,7 @@
     "dev": "ts-node src/http/server.ts",
     "cli": "ts-node src/index.ts",
     "build": "tsc",
+    "prestart": "chmod +x node_modules/.bin/ts-node",
     "start": "ts-node src/http/server.ts"
   },
   "keywords": [],
@@ -17,17 +18,18 @@
     "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "cross-fetch": "^4.1.0",
+    "debug": "^4.4.1",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "openai": "^5.12.2",
-    "zod": "^3.25.76",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
-    "typescript": "^5.9.2",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
   }
 }
