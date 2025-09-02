@@ -6,7 +6,7 @@
     "dev": "ts-node src/http/server.ts",
     "cli": "ts-node src/index.ts",
     "build": "tsc",
-    "prestart": "chmod +x node_modules/.bin/ts-node",
+    "prestart": "cross-env NODE_ENV=production ts-node src/http/server.ts",
     "start": "ts-node src/http/server.ts"
   },
   "keywords": [],
@@ -17,6 +17,7 @@
     "@solana/web3.js": "^1.98.4",
     "bs58": "^6.0.0",
     "cors": "^2.8.5",
+    "cross-env": "^10.0.0",
     "cross-fetch": "^4.1.0",
     "debug": "^4.4.1",
     "dotenv": "^17.2.1",
