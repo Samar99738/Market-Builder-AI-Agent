@@ -6,7 +6,7 @@
     "dev": "ts-node src/http/server.ts",
     "cli": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "ts-node src/http/server"
+    "start": "ts-node src/http/server.ts"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +27,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "ts-node": "^10.9.2"
   }
 }
