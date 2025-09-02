@@ -2,7 +2,6 @@
   "name": "market_builder_agent",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "dev": "ts-node src/http/server.ts",
     "cli": "ts-node src/index.ts",
