@@ -1,37 +1,56 @@
 import "dotenv/config";
 import { StrategySpecSchema, StrategySpec } from "../schema";
 import { llmComplete } from "./llm";
+import { localSymbolToMeta } from "../runtime/functions";
 
 // uses regex to handle a simple "Buy" command format
 function parseSimpleBuy(nl: string): StrategySpec | null {
   if (typeof nl !== "string" || !nl.trim()) return null;
 
-  // match instructions like: Buy TOKEN for 10 USDC every 1 hour
-  const pattern =
-    /^Buy\s+([A-Za-z0-9:_\-]+)\s+for\s+(\d+(?:\.\d+)?)\s+(USDC|SOL)(?:\s+every\s+(\d+)\s+(minutes?|hours?))?$/i;
+  // match instructions like: Buy TOKEN for 10 USDC every 1 hour [when the market cap is > ...]
+  const pattern = /^Buy\s+([A-Za-z0-9:_\-]+)\s+for\s+(\d+(?:\.\d+)?)\s+(USDC|SOL)(?:\s+every\s+(\d+)\s+(minutes?|hours?))?(?:\s+when\s+the\s+market\s+cap\s+is\s*>\s*(\d+))?/i;
 
   const m = nl.trim().match(pattern);
   if (!m) return null;
 
-  const tokenOrMint = m[1];
+  let tokenOrMint = m[1];
   const amount = Number(m[2]);
   const currency = m[3].toUpperCase() as "USDC" | "SOL";
+  // Patch: map common tokens to devnet mint addresses
+  const devnetMints: Record<string, string> = {
+    JUP: "JUPy4wrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", // Example: replace with actual devnet JUP mint
+    USDC: "Ejmc1UB4EsES5UfwnG6RZotwA9b6GzEhhQ1muQ8vG7hM", // Devnet USDC mint
+  };
+  // Import localSymbolToMeta from runtime/functions
+  // Use ES import at top of file
+  let buyStep: any = { type: "buy", budget: { amount, currency } };
+  // Always resolve mint address and set outputMint
+  let resolvedMint = undefined;
+  if (tokenOrMint.toUpperCase() in devnetMints) {
+    resolvedMint = devnetMints[tokenOrMint.toUpperCase()];
+  } else {
+    // Try to resolve symbol to mint address using localSymbolToMeta
+    const meta = localSymbolToMeta(tokenOrMint, "devnet");
+    if (meta && meta.mint) {
+      resolvedMint = meta.mint;
+    } else {
+      // Fallback: treat tokenOrMint as mint address
+      resolvedMint = tokenOrMint;
+    }
+  }
+  buyStep.outputMint = resolvedMint;
+  if (buyStep.token) delete buyStep.token;
 
   const everyN = m[4] ? Number(m[4]) : undefined;
   const unitRaw = m[5] ? String(m[5]).toLowerCase() : undefined;
   const unit =
     unitRaw?.startsWith("hour") ? "hours" : unitRaw?.startsWith("minute") ? "minutes" : undefined;
 
+  const minMcap = m[6] ? Number(m[6]) : undefined;
+
   if (!amount || amount <= 0) return null;
 
-  // define the steps for the strategy (buy, and maybe wait)
-  const steps: StrategySpec["steps"] = [
-    {
-      type: "buy",
-      token: tokenOrMint,
-      budget: { amount, currency },
-    } as any,
-  ];
+  const steps: StrategySpec["steps"] = [buyStep];
 
   if (everyN && unit) {
     steps.push({
@@ -42,10 +61,14 @@ function parseSimpleBuy(nl: string): StrategySpec | null {
   }
 
   // return a structured strategy object
-  return {
-    name: `Buy ${tokenOrMint} for ${amount} ${currency}${everyN && unit ? ` every ${everyN} ${unit}` : ""}`,
+  const strategy: StrategySpec = {
+    name: `Buy ${tokenOrMint} for ${amount} ${currency}${everyN && unit ? ` every ${everyN} ${unit}` : ""}${minMcap ? ` when the market cap is > ${minMcap}` : ""}`,
     steps,
   };
+  if (minMcap) {
+    (strategy as any).constraints = { min_mcap: minMcap };
+  }
+  return strategy;
 }
 
 // try to parse the natural language into a structured strategy

@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import { PublicKey, Connection, clusterApiUrl } from "@solana/web3.js";
-import { getMint } from "@solana/spl-token";
+import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { getBestRoute } from "./jupiter";
 import { resolveSymbolViaRegistry as resolveViaRegistryRaw } from "./tokenRegistry";
 
@@ -47,7 +47,7 @@ function looksLikeMint(s: string): boolean {
 
 // Local fallback mapping for common tokens (SOL, USDC)
 // Used when registry lookup fails or isn’t available
-function localSymbolToMeta(symbol: string, network: Network): TokenMeta | null {
+export function localSymbolToMeta(symbol: string, network: Network): TokenMeta | null {
   const sym = (symbol || "").toUpperCase();
   if (sym === "SOL") {
     return { symbol: "SOL", mint: "So11111111111111111111111111111111111111112", decimals: 9 };
@@ -67,12 +67,45 @@ function localSymbolToMeta(symbol: string, network: Network): TokenMeta | null {
       decimals: 6,
     };
   }
+  if (sym === "JUP") {
+    if (network === "mainnet") {
+      return {
+        symbol: "JUP",
+        mint: "JUPy4wrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        decimals: 6,
+      };
+    }
+    // Devnet fallback (Jupiter devnet mint)
+    return {
+      symbol: "JUP",
+      mint: "JUPy4wrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      decimals: 6,
+    };
+  }
   return null;
 }
 
 // Fetch decimals for a token mint directly from chain
 async function getDecimalsForMint(mint: string, network: Network): Promise<number> {
   const conn = getConn(network);
+  const mi = await getMint(conn, new PublicKey(mint));
+  return mi.decimals;
+}
+
+// Ensure the mint exists on the cluster and return its decimals. Throws if not found.
+async function verifyMintOnCluster(mint: string, network: Network): Promise<number> {
+  const conn = getConn(network);
+  const info = await conn.getAccountInfo(new PublicKey(mint));
+  if (!info) {
+    throw new Error(`Mint not found on ${network}: ${mint}`);
+  }
+  // Owner must be either SPL Token or Token-2022 program
+  const owner = info.owner.toBase58();
+  const okOwner = owner === TOKEN_PROGRAM_ID.toBase58() || owner === TOKEN_2022_PROGRAM_ID.toBase58();
+  if (!okOwner) {
+    throw new Error(`Invalid mint owner (${owner}) for ${mint} on ${network}`);
+  }
+  // getMint also validates account layout and returns decimals
   const mi = await getMint(conn, new PublicKey(mint));
   return mi.decimals;
 }
@@ -112,7 +145,7 @@ export function inputMintForCurrency(
 export async function resolveTokenMeta(token: string, network: Network): Promise<TokenMeta> {
   // 1) If token is a literal mint address, fetch decimals from chain
   if (looksLikeMint(token)) {
-    const decimals = await getDecimalsForMint(token, network);
+  const decimals = await getDecimalsForMint(token, network);
     return { symbol: token, mint: token, decimals };
   }
 
@@ -131,12 +164,33 @@ export async function resolveTokenMeta(token: string, network: Network): Promise
         "USDC maps to mainnet mint on devnet; use the devnet USDC test mint (Gh9Z...) or switch to mainnet."
       );
     }
-    return reg;
+    // Guard: block mainnet-only mints on devnet
+    if (
+      network === "devnet" &&
+      reg.mint &&
+      (
+        // Mainnet RAY mint
+        (sym === "RAY" && reg.mint === "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R") ||
+        // Add more mainnet-only mints here as needed
+        false
+      )
+    ) {
+      throw new Error(
+        `network-mismatch mint: ${sym} is not available on devnet. Use a devnet-listed token or switch to mainnet.`
+      );
+    }
+  // Verify mint exists on this cluster and fetch authoritative decimals from chain
+  const decimals = await verifyMintOnCluster(reg.mint, network);
+  return { symbol: sym, mint: reg.mint, decimals };
   }
 
   // 3) Local fallback for core tokens
   const local = localSymbolToMeta(sym, network);
-  if (local) return local;
+  if (local) {
+    // Verify local fallback mint exists and fetch authoritative decimals
+    const decimals = await verifyMintOnCluster(local.mint, network);
+    return { symbol: sym, mint: local.mint, decimals };
+  }
 
   // Throw explicit error if symbol isn’t found for given network
   if (network === "devnet") {
@@ -166,6 +220,7 @@ export async function getQuoteSummary(
     outputMint: outMeta.mint,
     amount: amountAtomic,
     slippageBps,
+    environment: network === "mainnet" ? "mainnet-beta" : "devnet",
   });
 
   // Extract output amount (different Jupiter versions may store it in different fields)

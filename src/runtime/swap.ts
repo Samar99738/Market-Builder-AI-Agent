@@ -8,6 +8,7 @@ export type BuildSwapArgs = {
   user: Keypair;
   quoteResponse: any; // Best route object from Jupiter quote API
   wrapAndUnwrapSol?: boolean;
+  environment?: "mainnet-beta" | "devnet";
 };
 
 // Build a swap transaction using Jupiter's Swap API and sign it with the user's keypair
@@ -16,14 +17,16 @@ export async function buildSwapTransaction({
   user,
   quoteResponse,
   wrapAndUnwrapSol = true,
+  environment,
 }: BuildSwapArgs): Promise<VersionedTransaction> {
   const url = "https://quote-api.jup.ag/v6/swap";
 
   // Payload for Jupiter swap transaction with preferences for reliability on devnet
-  const payload = {
+  const payload: any = {
     quoteResponse,
     userPublicKey: user.publicKey.toBase58(),
-    wrapAndUnwrapSol: !!wrapAndUnwrapSol,
+    // Let Jupiter handle SOL wrapping inside the swap when needed
+    wrapAndUnwrapSol: true,
     asLegacyTransaction: true,
     dynamicComputeUnitLimit: false,
     dynamicSlippage: false,
@@ -31,6 +34,7 @@ export async function buildSwapTransaction({
     maxAccounts: 22,
     useTokenLedger: false,
   };
+  if (environment) payload.environment = environment;
 
   // Send request to Jupiter API with retry logic
   const res = await withRetry(async () => {
@@ -89,6 +93,11 @@ export async function sendAndConfirm(connection: Connection, tx: VersionedTransa
     if (/too large/i.test(msg) || /max.*encoded\/raw/i.test(msg)) {
       throw new Error(
         "TX_TOO_LARGE: Route produced an oversized transaction. Try a smaller amount or a token with a direct SOL route on devnet."
+      );
+    }
+    if (/Unsupported program id/i.test(msg) || /Program .* is not supported/i.test(msg)) {
+      throw new Error(
+        "UNSUPPORTED_PROGRAM_ID_DEVNET: The built route includes a program not executable on devnet (often the Jupiter aggregator). Use simulation mode on devnet, switch to mainnet (set ALLOW_MAINNET=1), or implement a direct AMM swap (e.g., Orca Whirlpool) instead."
       );
     }
     throw e;

@@ -1,0 +1,20 @@
+import type { Program } from "@coral-xyz/anchor";
+import type { Instruction } from "@orca-so/common-sdk";
+import type { AccountMeta, PublicKey } from "@solana/web3.js";
+import type { Whirlpool } from "../../artifacts/whirlpool";
+export type CollectProtocolFeesV2Params = {
+    whirlpoolsConfig: PublicKey;
+    whirlpool: PublicKey;
+    collectProtocolFeesAuthority: PublicKey;
+    tokenMintA: PublicKey;
+    tokenMintB: PublicKey;
+    tokenVaultA: PublicKey;
+    tokenVaultB: PublicKey;
+    tokenOwnerAccountA: PublicKey;
+    tokenOwnerAccountB: PublicKey;
+    tokenTransferHookAccountsA?: AccountMeta[];
+    tokenTransferHookAccountsB?: AccountMeta[];
+    tokenProgramA: PublicKey;
+    tokenProgramB: PublicKey;
+};
+export declare function collectProtocolFeesV2Ix(program: Program<Whirlpool>, params: CollectProtocolFeesV2Params): Instruction;

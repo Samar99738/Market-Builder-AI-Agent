@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Market Builder Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg:#0b1220; --panel:#121a2b; --muted:#7a869a; --text:#dbe2f1; --accent:#4da3ff; --ok:#18b26b; --warn:#ffaf38; --err:#ff5c78;
+    --border:#263149; --code:#0f172a; --chip:#1a2540;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+  .h1 { font-size: 24px; font-weight: 700; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 380px; gap: 16px; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border:1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap: wrap; }
+  .label { font-size:13px; color: var(--muted); margin-right: 6px; }
+  textarea, select, input[type="text"] {
+    width: 100%; background: #0c1527; color: var(--text); border:1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size:14px;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  button {
+    background: #1e2a44; color: var(--text); border:1px solid var(--border);
+    padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+  button.primary { background: var(--accent); color:#081225; border-color: transparent; }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .hint { background: #111a2d; border:1px dashed var(--border); color: var(--muted); padding:10px; border-radius:8px; font-size:13px; }
+  .section-title { font-size: 13px; color: var(--muted); margin: 6px 0 8px; }
+  .code { background: var(--code); color:#e6edf7; border:1px solid var(--border); border-radius:8px; padding:12px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+  .flex { display:flex; gap:10px; flex-wrap: wrap; }
+  .chip { background: var(--chip); color:#c6d3ee; border:1px solid var(--border); font-size:12px; padding:6px 8px; border-radius: 999px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+  .split { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  @media (max-width: 700px) { .split { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="h1">Market Builder Agent</div>
+    <p class="sub">Turn plain-English strategies into executable actions. Simulate safely or execute on-chain when ready.</p>
+
+    <div class="grid">
+      <!-- Left column -->
+      <div class="card">
+        <div class="row" style="justify-content: space-between;">
+          <div class="row">
+            <span class="label">Examples:</span>
+            <button onclick="setExample(0)">Buy SOL for 1 USDC</button>
+            <button onclick="setExample(1)">Buy RAY for 0.02 SOL</button>
+            <button onclick="setExample(2)">Buy JUP for 0.01 SOL</button>
+          </div>
+          <div class="row">
+            <span class="label">Network</span>
+            <select id="network">
+              <option value="mainnet">mainnet</option>
+              <option value="devnet">devnet</option>
+            </select>
+            <label class="row" style="gap:6px;">
+              <input id="execute" type="checkbox"> Execute on-chain
+            </label>
+          </div>
+        </div>
+
+        <div class="section-title">Market Cap Lookup</div>
+<div class="row">
+  <input id="mcap-symbol" type="text" placeholder="Token symbol (e.g. JUP)" style="max-width:120px;">
+  <input id="mcap-quote" type="text" placeholder="Quote (e.g. USDC)" value="USDC" style="max-width:120px;">
+  <button onclick="lookupMarketCap()">Lookup Market Cap</button>
+</div>
+<div id="mcap-result" class="hint" style="margin-top:8px;"></div>
+
+        <div class="section-title">Strategy</div>
+        <textarea id="txt" placeholder="e.g., Buy SOL for 1 USDC"></textarea>
+
+        <div class="row" style="margin-top:10px;">
+          <button id="btn-parse" onclick="parseStrategy()">Parse</button>
+          <button id="btn-run" class="primary" onclick="runStrategy()">Run</button>
+          <button id="btn-code" onclick="genCode()">Generate Code</button>
+          <button onclick="copyOut()">Copy Output</button>
+          <button onclick="clearOut()">Clear</button>
+        </div>
+
+        <div style="margin-top:12px;" class="hint" id="hint">
+          Tip: Simulate on mainnet first (Execute off). On devnet, prefer SOL as input due to limited USDC routes.
+        </div>
+
+        <div class="split" style="margin-top:12px;">
+          <div>
+            <div class="section-title">Output</div>
+            <pre id="out" class="code">// Results will appear here</pre>
+          </div>
+          <div>
+            <div class="section-title">Generated Code</div>
+            <pre id="code" class="code">// Generated JavaScript will appear here</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="card">
+        <div class="section-title">Session</div>
+        <div id="badges" class="flex" style="margin-bottom: 8px;">
+          <span class="chip" id="badge-env">ENV: local</span>
+          <span class="chip" id="badge-port">PORT: -</span>
+          <span class="chip" id="badge-model">MODEL: -</span>
+        </div>
+
+        <div class="section-title">History</div>
+        <div id="history" class="code" style="max-height: 220px; overflow:auto;"></div>
+
+        <div class="section-title">Notes</div>
+        <div class="hint">
+          - Execute requires server-side keys. Never paste secrets in the browser.<br/>
+          - Mainnet execution moves real funds; start tiny.<br/>
+          - Devnet often restricts USDC; try SOL as input.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Market Cap Lookup function
+  async function lookupMarketCap() {
+    const symbol = document.getElementById("mcap-symbol").value.trim();
+    const quote = document.getElementById("mcap-quote").value.trim() || "USDC";
+    if (!symbol) {
+      document.getElementById("mcap-result").textContent = "Please enter a token symbol.";
+      return;
+    }
+    document.getElementById("mcap-result").textContent = "Looking up...";
+    try {
+      const r = await fetch(`/api/marketcap?symbol=${encodeURIComponent(symbol)}&quote=${encodeURIComponent(quote)}`);
+      const j = await r.json();
+      if (j.ok) {
+        document.getElementById("mcap-result").innerHTML = `<b>${j.symbol}/${j.quote}</b> Market Cap: <span class='ok'>$${j.marketCap.toLocaleString()}</span>`;
+      } else {
+        document.getElementById("mcap-result").innerHTML = `<span class='err'>${j.error || "Not found"}</span>`;
+      }
+    } catch (e) {
+      document.getElementById("mcap-result").innerHTML = `<span class='err'>${e?.message || e}</span>`;
+    }
+  }
+  window.lookupMarketCap = lookupMarketCap;
+
+  const $ = (id) => document.getElementById(id);
+  const state = { loading: false };
+
+  const examples = [
+    "Buy SOL for 1 USDC",
+    "Buy RAY for 0.02 SOL",
+    "Buy JUP for 0.01 SOL"
+  ];
+  function setExample(i) { $("txt").value = examples[i] || ""; }
+
+  function setLoading(v) {
+    state.loading = v;
+    $("btn-parse").disabled = v;
+    $("btn-run").disabled = v;
+    $("btn-code").disabled = v;
+  }
+
+  function showOut(obj) {
+    $("out").textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+  }
+  function showCode(text) {
+    $("code").textContent = text || "";
+  }
+  function copyOut() {
+    navigator.clipboard.writeText($("out").textContent || "").then(() => {
+      $("hint").textContent = "Copied output to clipboard.";
+      setTimeout(() => { $("hint").textContent = "Tip: Simulate on mainnet first (Execute off). On devnet, prefer SOL as input due to limited USDC routes."; }, 1500);
+    });
+  }
+  function clearOut() {
+    $("out").textContent = "";
+    $("code").textContent = "";
+  }
+
+  function pushHistory(entry) {
+    const max = 10;
+    const list = JSON.parse(localStorage.getItem("mb_history") || "[]");
+    list.unshift({ t: Date.now(), ...entry });
+    while (list.length > max) list.pop();
+    localStorage.setItem("mb_history", JSON.stringify(list));
+    renderHistory();
+  }
+  function renderHistory() {
+    const list = JSON.parse(localStorage.getItem("mb_history") || "[]");
+    const fmt = (ts) => new Date(ts).toLocaleTimeString();
+    $("history").textContent = list.map(x => `[${fmt(x.t)}] ${x.network} ${x.execute ? "EXEC" : "SIM"} :: ${x.text}`).join("\n");
+  }
+
+  async function parseStrategy() {
+    const text = $("txt").value.trim();
+    if (!text) return;
+    setLoading(true);
+    const t0 = performance.now();
+    try {
+      const r = await fetch("/api/parse", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ text })
+      });
+      const j = await r.json();
+      showOut(j);
+      pushHistory({ text, network: $("network").value, execute: false });
+    } catch (e) {
+      showOut(String(e));
+    } finally {
+      setLoading(false);
+      const dt = Math.round(performance.now() - t0);
+      $("badge-env").textContent = "ENV: browser";
+      $("badge-port").textContent = "PORT: " + (location.port || "80");
+      $("badge-model").textContent = "MODEL: server";
+      $("hint").textContent = "Parse complete in " + dt + "ms.";
+      setTimeout(() => { $("hint").textContent = "Tip: Simulate on mainnet first (Execute off). On devnet, prefer SOL as input due to limited USDC routes."; }, 1500);
+    }
+  }
+
+  async function runStrategy() {
+    const text = $("txt").value.trim();
+    const network = $("network").value;
+    const execute = $("execute").checked;
+    if (!text) return;
+
+    if (execute && network === "mainnet") {
+      if (!confirm("Executing on mainnet will move real funds. Proceed?")) return;
+    }
+
+    setLoading(true);
+    const t0 = performance.now();
+    try {
+      const r = await fetch("/api/run", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ text, network, execute })
+      });
+      const j = await r.json();
+      showOut(j);
+      pushHistory({ text, network, execute });
+    } catch (e) {
+      showOut(String(e));
+    } finally {
+      setLoading(false);
+      const dt = Math.round(performance.now() - t0);
+      $("hint").textContent = (execute ? "Execution" : "Simulation") + " finished in " + dt + "ms.";
+      setTimeout(() => { $("hint").textContent = "Tip: Simulate on mainnet first (Execute off). On devnet, prefer SOL as input due to limited USDC routes."; }, 1500);
+    }
+  }
+
+  async function genCode() {
+    const text = $("txt").value.trim();
+    const network = $("network").value;
+    if (!text) return;
+    setLoading(true);
+    const t0 = performance.now();
+    try {
+      const r = await fetch("/api/code", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ text, network })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        showCode(j.code);
+      } else {
+        showCode("");
+        showOut(j);
+      }
+      pushHistory({ text, network, execute: false });
+    } catch (e) {
+      showCode("");
+      showOut(String(e));
+    } finally {
+      setLoading(false);
+      const dt = Math.round(performance.now() - t0);
+      $("hint").textContent = "Code generated in " + dt + "ms.";
+      setTimeout(() => { $("hint").textContent = "Tip: Simulate on mainnet first (Execute off). On devnet, prefer SOL as input due to limited USDC routes."; }, 1500);
+    }
+  }
+
+  // init
+  renderHistory();
+</script>
+</body>
+</html>

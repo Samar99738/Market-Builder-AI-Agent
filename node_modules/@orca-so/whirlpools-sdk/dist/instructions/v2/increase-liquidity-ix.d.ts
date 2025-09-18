@@ -1,0 +1,24 @@
+import type { Program } from "@coral-xyz/anchor";
+import type { AccountMeta, PublicKey } from "@solana/web3.js";
+import type { Whirlpool } from "../../artifacts/whirlpool";
+import type { IncreaseLiquidityInput } from "../..";
+import type { Instruction } from "@orca-so/common-sdk";
+export type IncreaseLiquidityV2Params = {
+    whirlpool: PublicKey;
+    position: PublicKey;
+    positionTokenAccount: PublicKey;
+    positionAuthority: PublicKey;
+    tokenMintA: PublicKey;
+    tokenMintB: PublicKey;
+    tokenOwnerAccountA: PublicKey;
+    tokenOwnerAccountB: PublicKey;
+    tokenVaultA: PublicKey;
+    tokenVaultB: PublicKey;
+    tokenTransferHookAccountsA?: AccountMeta[];
+    tokenTransferHookAccountsB?: AccountMeta[];
+    tokenProgramA: PublicKey;
+    tokenProgramB: PublicKey;
+    tickArrayLower: PublicKey;
+    tickArrayUpper: PublicKey;
+} & IncreaseLiquidityInput;
+export declare function increaseLiquidityV2Ix(program: Program<Whirlpool>, params: IncreaseLiquidityV2Params): Instruction;

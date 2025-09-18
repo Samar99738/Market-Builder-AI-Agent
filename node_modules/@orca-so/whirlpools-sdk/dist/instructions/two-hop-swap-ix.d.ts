@@ -1,0 +1,38 @@
+import type { Program } from "@coral-xyz/anchor";
+import type { Instruction } from "@orca-so/common-sdk";
+import type { PublicKey } from "@solana/web3.js";
+import type BN from "bn.js";
+import type { Whirlpool } from "../artifacts/whirlpool";
+export type TwoHopSwapParams = TwoHopSwapInput & {
+    whirlpoolOne: PublicKey;
+    whirlpoolTwo: PublicKey;
+    tokenOwnerAccountOneA: PublicKey;
+    tokenOwnerAccountOneB: PublicKey;
+    tokenOwnerAccountTwoA: PublicKey;
+    tokenOwnerAccountTwoB: PublicKey;
+    tokenVaultOneA: PublicKey;
+    tokenVaultOneB: PublicKey;
+    tokenVaultTwoA: PublicKey;
+    tokenVaultTwoB: PublicKey;
+    oracleOne: PublicKey;
+    oracleTwo: PublicKey;
+    tokenAuthority: PublicKey;
+};
+export type TwoHopSwapInput = {
+    amount: BN;
+    otherAmountThreshold: BN;
+    amountSpecifiedIsInput: boolean;
+    aToBOne: boolean;
+    aToBTwo: boolean;
+    sqrtPriceLimitOne: BN;
+    sqrtPriceLimitTwo: BN;
+    tickArrayOne0: PublicKey;
+    tickArrayOne1: PublicKey;
+    tickArrayOne2: PublicKey;
+    tickArrayTwo0: PublicKey;
+    tickArrayTwo1: PublicKey;
+    tickArrayTwo2: PublicKey;
+    supplementalTickArraysOne?: PublicKey[];
+    supplementalTickArraysTwo?: PublicKey[];
+};
+export declare function twoHopSwapIx(program: Program<Whirlpool>, params: TwoHopSwapParams): Instruction;
